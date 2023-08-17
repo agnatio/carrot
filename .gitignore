@@ -1,0 +1,20 @@
+# Ignore all files
+*
+
+# But don't ignore these directories (so we can further specify files inside them)
+!/static/
+!/templates/
+!/documents/
+
+# For the documents directory, ignore all contents except .gitkeep
+documents/*
+!documents/*/.gitkeep
+
+# Don't ignore Python files
+!*.py
+
+# Don't ignore these specific files
+!.gitignore
+!documents/signatures/Fox-512.png
+!README.md
+```
