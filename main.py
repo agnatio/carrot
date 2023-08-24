@@ -1,9 +1,11 @@
 from fastapi import FastAPI, Request, Form
 from fastapi.templating import Jinja2Templates
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import uvicorn
 import os
+import shutil
 
 from signing import Document, ImageProcessor, PDFSigner, SIGNATURES, SIGNED
 
@@ -14,6 +16,7 @@ app.mount("/static", StaticFiles(directory=os.path.join(dir_path, "static")), na
 app.mount("/documents", StaticFiles(directory=os.path.join(dir_path, "documents")), name="documents")
 app.mount("/documents/unsigned", StaticFiles(directory=os.path.join(dir_path, "documents", "unsigned")), name="unsigned")
 app.mount("/documents/signed", StaticFiles(directory=os.path.join(dir_path, "documents", "signed")), name="signed")
+app.mount("/documents/update_signature", StaticFiles(directory=os.path.join(dir_path, "documents", "update_signature")), name="update_signature")
 
 
 
@@ -25,6 +28,17 @@ async def root(request: Request):
 async def signatures(request: Request):
     signatures = [s for s in os.listdir(os.path.join(dir_path, "documents", "signatures")) if s.endswith('.png')]
     return templates.TemplateResponse("signatures.html", {"request": request, "signatures": signatures})
+
+@app.get("/update_signature/{signature}")
+async def edit_signature(request: Request, signature: str):
+    return templates.TemplateResponse("signature_edit.html", {"request": request, "signature": signature})
+
+@app.post("/update_signature/{signature}")
+async def update_signature(request: Request, signature: str, param1: str = Form(...), param2: str = Form(...)):
+    # Handle form data and update the signature
+    # For now, just redirect back to the edit page
+    return RedirectResponse(url=f"/update_signature/{signature}")
+
 
 @app.get("/documents")
 async def list_documents(request: Request):
@@ -71,6 +85,6 @@ async def signatures(request: Request):
 
 if __name__ == '__main__':
 
-    uvicorn.run(app, host="localhost", port=8080)
+    uvicorn.run(app, host="localhost", port=8000)
 
 
