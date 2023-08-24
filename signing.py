@@ -14,24 +14,6 @@ class Document:
         self.unsigned = os.path.join(UNSIGNED, doc_name)
         self.signed = os.path.join(SIGNED, f"{os.path.splitext(doc_name)[0]}_signed.pdf")
 
-# class ImageProcessor:
-#     def __init__(self, image_path):
-#         self.image_path = image_path
-
-#     def flip_and_shrink(self, shrink_percentage=20):
-#         with Image.open(self.image_path) as img:
-#             flipped_img = img.transpose(Image.FLIP_TOP_BOTTOM)
-#             new_width = int(flipped_img.width * (1 - (shrink_percentage / 100)))
-#             new_height = int(flipped_img.height * (1 - (shrink_percentage / 100)))
-#             resized_img = flipped_img.resize((new_width, new_height))
-#             return resized_img
-
-#     def save_processed_image(self, output_path=None):
-#         flipped_image = self.flip_and_shrink()
-#         if not output_path:
-#             output_path = os.path.join(CURRENT_DIR, "temp_flipped_signature.png")
-#         flipped_image.save(output_path)
-#         return output_path
     
 class ImageProcessor:
     def __init__(self, image_path):
