@@ -1,89 +1,108 @@
+from abc import ABC, abstractmethod
+
 import fitz
 from PIL import Image
 import os
 from datetime import datetime
+import io
 
 # Define constants for folder paths
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-UNSIGNED = os.path.join(CURRENT_DIR, 'documents', 'unsigned')
-SIGNED = os.path.join(CURRENT_DIR, 'documents', 'signed')
-SIGNATURES = os.path.join(CURRENT_DIR, 'documents', 'signatures')
+UNSIGNED = os.path.join(CURRENT_DIR, "documents", "unsigned")
+SIGNED = os.path.join(CURRENT_DIR, "documents", "signed")
+SIGNATURES = os.path.join(CURRENT_DIR, "documents", "signatures")
 
-class Document:
-    def __init__(self, doc_name):
-        self.unsigned = os.path.join(UNSIGNED, doc_name)
-        self.signed = os.path.join(SIGNED, f"{os.path.splitext(doc_name)[0]}_signed.pdf")
 
-    
+class DocumentToSign:
+    def __init__(self, filename: str):
+        self.pdf_path = os.path.join(UNSIGNED, filename)
+        self.doc = fitz.open(self.pdf_path)
+        # calculate the number of pages in the document
+        self.num_pages = self.doc.page_count
+
+
 class ImageProcessor:
-    def __init__(self, image_path):
-        self.image_path = image_path
+    def __init__(self, image_name="extracted_signature.png"):
+        self.image_path = os.path.join(SIGNATURES, image_name)
         self.image = Image.open(self.image_path)
-        self.updated_signatures = os.path.join("documents", "update_signature")
 
-    def flip_image(self, mode=Image.FLIP_TOP_BOTTOM):
-        if mode not in [Image.FLIP_TOP_BOTTOM, Image.FLIP_LEFT_RIGHT]:
-            raise ValueError("Invalid flip mode provided.")
-            
+    def flip(self, mode=Image.FLIP_TOP_BOTTOM):
         self.image = self.image.transpose(mode)
         return self
-        
-    def shrink_image(self, shrink_percentage=20):
-        new_width = int(self.image.width * (1 - (shrink_percentage / 100)))
-        new_height = int(self.image.height * (1 - (shrink_percentage / 100)))
+
+    def resize(self, coefficient=1):
+        new_width = int(self.image.width * coefficient)
+        new_height = int(self.image.height * coefficient)
         self.image = self.image.resize((new_width, new_height))
         return self
 
-    def save_processed_image(self, output_path=None, input_image: Image=None):
-        if not input_image:
-            input_image = self.image
+    def get_image(self):
+        return self.image
+
+
+class SignedDocument:
+    def __init__(
+        self, document_to_sign, signature_processor, signature_positions: dict
+    ):
+        self.doc = document_to_sign.doc
+        self.signature = signature_processor.get_image()
+        self.signature_positions = signature_positions
+        self._embed_signatures()
+
+    def _embed_signatures(self):
+        # Convert the PIL Image to bytes in PNG format
+        img_stream = io.BytesIO()
+        self.signature.save(img_stream, format="PNG")
+        img_data = img_stream.getvalue()
+
+        # Calculate the aspect ratio of the signature image
+        img_width, img_height = self.signature.size
+        aspect_ratio = img_width / img_height
+
+        for page_num, positions in self.signature_positions.items():
+            for pos in positions:
+                x, y = pos
+                rect = fitz.Rect(x, y, x + img_width, y + img_height)
+                if page_num < len(
+                    self.doc
+                ):  # Ensure we're not trying to add a signature beyond the number of pages in the doc
+                    self.doc[page_num].insert_image(rect, stream=img_data)
+
+    def save(self, output_path=None):
         if not output_path:
-            output_path = os.path.join(CURRENT_DIR, self.updated_signatures, "changed_signature.png")
-        input_image.save(output_path)
+            base_name = os.path.basename(self.doc.name).split(".")[0]
+            output_path = os.path.join(SIGNED, f"{base_name}_signed.pdf")
+        self.doc.save(output_path)
+        print(f"Signed document saved at: {output_path}")
         return output_path
 
 
+signature_positions = {
+    0: [
+        (330, 90),
+    ],  # First page
+    1: [(330, 130)],  # Second page
+    # 2: [(400, 300)]              # Third page
+}
+document_to_sign = DocumentToSign("Invoice.pdf")
+document_to_sign = DocumentToSign("INVOICE_NAME2.pdf")
+print(document_to_sign.num_pages)
+signature = ImageProcessor()
+signed_document = SignedDocument(
+    document_to_sign, signature.resize(0.5), signature_positions
+)
+output_path = signed_document.save()
+# make output path relative to current directory
+relative_path = os.path.relpath(output_path, CURRENT_DIR)
+
+print(relative_path)
 
 
-class PDFSigner:
-    def __init__(self, document):
-        self.unsigned_pdf_path = document.unsigned
-        self.signed_pdf_path = document.signed
+# print(f"Signed document saved at: {output_path}")
 
-    def add_signature(self, image_path, coordinates_list):
-        doc = fitz.open(self.unsigned_pdf_path)
-        signature = fitz.open(image_path)
-        img_width, img_height = signature[0].rect.width, signature[0].rect.height
-        aspect_ratio = img_width / img_height
 
-        desired_width = 200
-        desired_height = desired_width / aspect_ratio
-
-        for page_num, coordinates in enumerate(coordinates_list):
-            x, y = coordinates
-            rect = fitz.Rect(x, y, x + desired_width, y + desired_height)
-            if page_num < len(doc):  # Ensure we're not trying to add a signature beyond the number of pages in the doc
-                doc[page_num].insert_image(rect, filename=image_path)
-
-        try:
-            doc.save(self.signed_pdf_path)
-            doc.close()
-            print(f"Successfully signed {self.signed_pdf_path}")
-        except Exception as e:
-            print(f"Error signing {self.signed_pdf_path}: {e}")
-        file_name = os.path.basename(self.signed_pdf_path)
-        return file_name
-
-if __name__ == '__main__':
-    # doc = Document('invoice.pdf')
-    # img_processor = ImageProcessor(os.path.join(SIGNATURES, 'extracted_signature.png'))
-    # processed_signature = img_processor.save_processed_image()
-    # signer = PDFSigner(doc)
-    # signer.add_signature(processed_signature, [(330, 90), (330, 180)])
-
-    
-
-    # modify and save the image
-    img = Image.open(os.path.join(SIGNATURES, 'extracted_signature.png'))
-    img_processor = ImageProcessor(os.path.join(SIGNATURES, 'extracted_signature.png'))
-    processed_signature = img_processor.flip_image(Image.FLIP_TOP_BOTTOM).shrink_image(70).save_processed_image()
+# document_to_sign = DocumentToSign('documents\\unsigned\\Invoice.pdf')
+# signature = ImageProcessor()
+# signed_document = SignedDocument(document_to_sign, signature.flip(Image.FLIP_TOP_BOTTOM).resize(0.25), [(150, 100), (300, 200)])
+# output_path = signed_document.save()
+# print(f"Signed document saved at: {output_path}")

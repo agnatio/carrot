@@ -5,35 +5,36 @@ from fastapi.staticfiles import StaticFiles
 import uvicorn
 import os
 
-import signing
+import signing_pattern2
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Configuration Dictionary for Mount Paths and Directories
-MOUNT_CONFIG = {
-    "/static": "static",
-    "/documents": "documents",
-    "/documents/unsigned": "documents/unsigned",
-    "/documents/signed": "documents/signed",
-    "/documents/update_signature": "documents/update_signature",
-}
-# Get the directory path of the current file
-dir_path = os.path.dirname(os.path.realpath(__file__))
-
-# Centralized directory path logic
-get_full_path = lambda subdir: os.path.join(dir_path, subdir)
-print(get_full_path("templates"))
-
-# Initialize FastAPI app and templates
 app = FastAPI()
-templates = Jinja2Templates(directory=get_full_path("templates"))
-
-# Iterate over MOUNT_CONFIG to mount each path
-for mount_path, directory in MOUNT_CONFIG.items():
-    app.mount(
-        mount_path, StaticFiles(directory=get_full_path(directory)), name=directory
-    )
-    print(f"Mounted {mount_path} to {directory}")
+dir_path = os.path.dirname(os.path.realpath(__file__))
+templates = Jinja2Templates(directory=os.path.join(dir_path, "templates"))
+app.mount(
+    "/static", StaticFiles(directory=os.path.join(dir_path, "static")), name="static"
+)
+app.mount(
+    "/documents",
+    StaticFiles(directory=os.path.join(dir_path, "documents")),
+    name="documents",
+)
+app.mount(
+    "/documents/unsigned",
+    StaticFiles(directory=os.path.join(dir_path, "documents", "unsigned")),
+    name="unsigned",
+)
+app.mount(
+    "/documents/signed",
+    StaticFiles(directory=os.path.join(dir_path, "documents", "signed")),
+    name="signed",
+)
+app.mount(
+    "/documents/update_signature",
+    StaticFiles(directory=os.path.join(dir_path, "documents", "update_signature")),
+    name="update_signature",
+)
 
 
 @app.get("/")
@@ -48,7 +49,6 @@ async def signatures(request: Request):
         for s in os.listdir(os.path.join(dir_path, "documents", "signatures"))
         if s.endswith(".png")
     ]
-    print(f"{signatures}")
     return templates.TemplateResponse(
         "signatures.html", {"request": request, "signatures": signatures}
     )
@@ -88,7 +88,7 @@ async def list_documents(request: Request):
 @app.get("/scan/{filename}")
 async def get_document(request: Request, filename: str):
     print(filename)
-    doc_to_sign = signing.DocumentToSign(filename)
+    doc_to_sign = signing_pattern2.DocumentToSign(filename)
     print(doc_to_sign.num_pages)
     signatures = [
         s
@@ -109,9 +109,9 @@ async def get_document(request: Request, filename: str):
 @app.get("/sign_document/")
 async def sign_document(request: Request, filename: str = None, signature: str = None):
     print(filename)
-    doc_to_sign = signing.DocumentToSign(filename)
+    doc_to_sign = signing_pattern2.DocumentToSign(filename)
     print(signature)
-    signature = signing.ImageProcessor(signature)
+    signature = signing_pattern2.ImageProcessor(signature)
 
     print(f"{type(doc_to_sign)} AND {type(signature)}")
 
@@ -123,7 +123,7 @@ async def sign_document(request: Request, filename: str = None, signature: str =
         # 2: [(400, 300)]              # Third page
     }
 
-    signed_document = signing.SignedDocument(
+    signed_document = signing_pattern2.SignedDocument(
         doc_to_sign, signature.flip().resize(0.5), signature_positions
     )
     output_path = signed_document.save()
@@ -133,10 +133,22 @@ async def sign_document(request: Request, filename: str = None, signature: str =
     return templates.TemplateResponse(
         "sign.html", {"request": request, "res": relative_path}
     )
+    # file_to_sign = Document(filename)
+    # document_to_sign = PDFSigner(file_to_sign)
+    # signature = os.path.join(SIGNATURES, signature)
+    # signature_processor = ImageProcessor(signature)
+    # processed_signature = signature_processor.save_processed_image()
+    # res = document_to_sign.add_signature(os.path.join(SIGNATURES, signature), [(330, 90), (330, 180)])
+    # return templates.TemplateResponse("sign.html", {"request": request, "filename": filename, "signature": processed_signature, "res": res})
+
+
+# @app.get("/signed/{path:path}")
+# async def signed(path: str):
+#     return FileResponse(os.path.join(SIGNED, path))
 
 
 @app.get("/sign")
-async def sign_docuemnt(request: Request):
+async def signatures(request: Request):
     return "Working on that..."
 
 
